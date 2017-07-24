@@ -32,19 +32,21 @@ Module.register("MMM-pushbullet-notifications", {
 		// and hide / show compliment module
 		connection.onmessage = function(e) {
 
-			message = JSON.parse(e.data); 
+			var message = JSON.parse(e.data); 
 			console.log(message);
-			
+
 			if (self.isNotification(message)) {
 				console.info("Alerting nofitication");
+				self.saveNotification(message);
 				self.sendNotification("SHOW_ALERT", self.notificationTranslator(message));
 			}
 
 			if (self.isDismissal(message)) {
-				console.info("Dismissing notification");
-				var notif = this.findNotification(message);
+				var notif = self.findNotificationFromDismissal(message);
 				if (notif != null) {
+					console.info("Dismissing notification");
 					self.sendNotification("HIDE_ALERT", notif);
+					self.removeNotificationFromDismissal(message);
 				}
 			}
 		};
@@ -82,12 +84,19 @@ Module.register("MMM-pushbullet-notifications", {
 		}
 	},
 
-	findNotification: function(message) {
+	findNotificationFromDismissal: function(message) {
 		return this.savedNotifications[this.getNotificationId(message)];
 	},
 
+	removeNotificationFromDismissal: function(message) {
+		delete this.savedNotifications[this.getNotificationId(message)];
+	},
+
 	saveNotification: function(message) {
-		this.savedNotifications[this.getNotificationId(message)] = message;
+		console.log(message);
+		if (message['push']['type'] == "sms_changed") {
+			this.savedNotifications["sms_0"] = message;
+		}
 	},
 
 	getNotificationId: function(message) {
