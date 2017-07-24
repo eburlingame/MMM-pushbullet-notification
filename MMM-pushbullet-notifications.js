@@ -34,12 +34,22 @@ Module.register("MMM-pushbullet-notifications", {
 
 			message = JSON.parse(e.data); 
 			console.log(message);
-			// TODO: Save the message and listen for dismissal events
-			if (self.notificationFilter(message)) {
+			
+			if (self.isNotification(message)) {
 				console.info("Alerting nofitication");
 				self.sendNotification("SHOW_ALERT", self.notificationTranslator(message));
 			}
+
+			if (self.isDismissal(message)) {
+				console.info("Dismissing notification");
+				var notif = this.findNotification(message);
+				if (notif != null) {
+					self.sendNotification("HIDE_ALERT", notif);
+				}
+			}
 		};
+
+		this.savedNotifications = {};
 	},
 
 	notificationReceived: function(notification, payload, sender) {
@@ -51,10 +61,16 @@ Module.register("MMM-pushbullet-notifications", {
 	},
 
 	// Helpers
-	notificationFilter: function(message) {
+	isNotification: function(message) {
 		return "type" in message && message['type'] == "push" && 
 			   "push" in message && message['push']['type'] == "sms_changed" && 
 			   "notifications" in message['push'] && message['push']['notifications'].length > 0;
+	},
+
+	isDismissal: function(message) {
+		return "type" in message && message['type'] == "push" && 
+		   "push" in message && message['push']['type'] == "dismissal" && 
+		   "package_name" in message['push'];
 	},
 
 	notificationTranslator: function(message) {
@@ -62,8 +78,22 @@ Module.register("MMM-pushbullet-notifications", {
 		return {
 			"title": notif['title'],
 			"message": notif['body'],
-			"timer": 10000
+			"timer": 30000
 		}
+	},
+
+	findNotification: function(message) {
+		return this.savedNotifications[this.getNotificationId(message)];
+	},
+
+	saveNotification: function(message) {
+		this.savedNotifications[this.getNotificationId(message)] = message;
+	},
+
+	getNotificationId: function(message) {
+		var notificationId = message['push']['notification_id'];
+		var package_name = message['push']['package_name'];
+		return package_name + "_" + notificationId;
 	}
 
 });
