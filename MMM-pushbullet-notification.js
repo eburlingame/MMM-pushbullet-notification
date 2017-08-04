@@ -36,14 +36,20 @@ Module.register("MMM-pushbullet-notification", {
 			var message = JSON.parse(e.data); 
 			console.log(message);
 
-			if (self.isNotification(message)) {
-				console.info("Alerting nofitication");
+			if (self.isTextNotification(message)) {
+				console.info("Alerting text nofitication");
 				self.saveNotification(message);
-				self.sendNotification("SHOW_ALERT", self.notificationTranslator(message));
+				self.sendNotification("SHOW_ALERT", self.textTranslator(message));
+			}
+			else if (self.isAppNotification(message)) {
+				console.info("Alerting app nofitication");
+				self.saveNotification(message);
+				self.sendNotification("SHOW_ALERT", self.appTranslator(message));
 			}
 
 			if (self.isDismissal(message)) {
 				var notif = self.findNotificationFromDismissal(message);
+				console.log(notif);
 				if (notif != null) {
 					console.info("Dismissing notification");
 					self.sendNotification("HIDE_ALERT", notif);
@@ -64,7 +70,11 @@ Module.register("MMM-pushbullet-notification", {
 	},
 
 	// Helpers
-	isNotification: function(message) {
+	isAppNotification: function(message) {
+		return "type" in message && message['type'] == "push" && 
+			   "push" in message && "application_name" in message['push'];
+	},
+	isTextNotification: function(message) {
 		return "type" in message && message['type'] == "push" && 
 			   "push" in message && message['push']['type'] == "sms_changed" && 
 			   "notifications" in message['push'] && message['push']['notifications'].length > 0;
@@ -76,7 +86,7 @@ Module.register("MMM-pushbullet-notification", {
 		   "package_name" in message['push'];
 	},
 
-	notificationTranslator: function(message) {
+	textTranslator: function(message) {
 		var notif = message['push']['notifications'][0];
 		return {
 			"title": notif['title'],
@@ -85,25 +95,36 @@ Module.register("MMM-pushbullet-notification", {
 		}
 	},
 
+	appTranslator: function(message) {
+		var push = message['push'];
+		return {
+			"title": push['title'],
+			"message": push['body'],
+			"timer": 15000
+		}
+	},
+
 	findNotificationFromDismissal: function(message) {
 		return this.savedNotifications[this.getNotificationId(message)];
 	},
 
 	removeNotificationFromDismissal: function(message) {
+		console.log("Removing " + this.getNotificationId(message));
 		delete this.savedNotifications[this.getNotificationId(message)];
 	},
 
 	saveNotification: function(message) {
 		console.log(message);
-		if (message['push']['type'] == "sms_changed") {
-			this.savedNotifications["sms_0"] = message;
-		}
+		this.savedNotifications[this.getNotificationId(message)] = message;
 	},
 
 	getNotificationId: function(message) {
 		var notificationId = message['push']['notification_id'];
-		var package_name = message['push']['package_name'];
-		return package_name + "_" + notificationId;
+		if (message['push']['type'] == "sms_changed") {
+			return "sms";
+		} else {
+			return notificationId;
+		}
 	}
 
 });
